@@ -1,38 +1,51 @@
-pipeline{
+pipeline {
     agent any
-    stages{
-        stage("checkout"){
-            steps{
-                echo "========executing checkout========"
+
+    stages {
+
+        stage("Checkout") {
+            steps {
+                echo "======== executing checkout ========"
                 checkout scm
             }
-        }            
-        stage("setup environment"){
-            steps{
-                  echo "========executing settingup environment========"
-                bat '''
-                python -m venv .venv1
-                call .venv1\\Scripts\\activate
-                pip install -r requirements.txt
-                '''
+        }
+
+        stage("Build Docker Image") {
+            steps {
+                script {
+                    echo "======== building docker image ========"
+                    bat 'docker build -t userresource-image:latest .'
+                }
             }
         }
-        stage("run tests"){
-            steps{
-                bat '''
-                echo "========executing unittests========"
-                call .venv1\\Scripts\\activate
-                pytest tests/
-                '''
+
+        stage("Stop Old Container") {
+            steps {
+                script {
+                    echo "======== stopping old container ========"
+                    bat 'docker stop userresource-container || exit 0'
+                    bat 'docker rm userresource-container || exit 0'
+                }
             }
         }
-        stage("Deploy"){
-            steps{
-                bat '''
-                 echo "========deploying========"
-                 start /B python app.py   
-                '''
+
+        stage("Deploy Docker Container") {
+            steps {
+                script {
+                    echo "======== running new container ========"
+                    bat 'docker run -d -p 5000:5000 --name userresource-container userresource-image:latest'
+                }
             }
         }
     }
-}  
+
+    post {
+        success {
+            echo "======== Deployment Successful ========"
+        }
+
+        failure {
+            echo "======== Deployment Failed ========"
+        }
+    }
+}
